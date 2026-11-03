@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>公众号文章导出</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --line: #e5e7eb; --text: #1f2328;
+    --muted: #6b7280; --accent: #0a7d4f; --accent-2: #0b6b45;
+    --warn: #b45309; --err: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px; margin-bottom: 16px;
+  }
+  label { display: block; font-weight: 600; margin: 12px 0 6px; font-size: 13px; }
+  label .hint { font-weight: 400; color: var(--muted); margin-left: 6px; }
+  textarea, input[type=text], input[type=date] {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; background: #fbfbfc; color: var(--text); outline: none;
+  }
+  textarea:focus, input:focus { border-color: var(--accent); background: #fff; }
+  textarea { min-height: 88px; resize: vertical; font-family: Consolas, monospace; font-size: 12px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 150px; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  button {
+    border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600;
+    cursor: pointer; background: var(--accent); color: #fff; transition: .15s;
+  }
+  button:hover { background: var(--accent-2); }
+  button:disabled { background: #c9ccd1; cursor: not-allowed; }
+  button.ghost { background: #eef2f0; color: var(--accent-2); }
+  button.ghost:hover { background: #e2eae6; }
+  .status { display: none; }
+  .status.on { display: block; }
+  .bars { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 6px; }
+  .metric b { font-size: 18px; }
+  .metric span { color: var(--muted); font-size: 12px; display: block; }
+  .phase { color: var(--accent-2); font-weight: 600; }
+  .msg { margin-top: 10px; font-size: 13px; }
+  .msg.warn { color: var(--warn); }
+  .msg.err { color: var(--err); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: #fafbfc; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td a { color: var(--accent-2); text-decoration: none; word-break: break-all; }
+  td a:hover { text-decoration: underline; }
+  .tblwrap { max-height: 62vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .empty { color: var(--muted); padding: 26px; text-align: center; }
+  details { margin-top: 14px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details .inner { padding: 10px 2px 2px; color: #374151; font-size: 13px; }
+  code { background: #f0f2f4; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .tag { display: inline-block; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>公众号文章导出</h1>
+  <div class="sub">一次粘贴凭据 → 选时间段 → 导出表格。凭据只保存在本机内存，关掉程序即消失。</div>
+
+  <div class="card">
+    <label>① 微信会话凭据 <span class="hint">粘贴完整的 getmsg 请求 URL（推荐）或 Cookie 字符串</span></label>
+    <textarea id="credential" placeholder="https://mp.weixin.qq.com/mp/profile_ext?action=getmsg&__biz=...&uin=...&key=...&pass_ticket=...&appmsg_token=..."></textarea>
+    <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="grab" class="ghost" type="button" style="padding:7px 14px;font-size:13px">读取本机抓取结果</button>
+      <span id="grabtip" class="tag">先双击「抓取凭据.bat」打开任意一篇文章；key 只活几十分钟到几小时，抓完尽快导</span>
+    </div>
+
+    <label>② 公众号 <span class="hint">粘贴该号任意一篇文章的链接，自动提取 __biz</span></label>
+    <input type="text" id="account" placeholder="https://mp.weixin.qq.com/s?__biz=...&mid=...&idx=1&sn=...&chksm=...">
+
+    <label>③ 时间段 <span class="hint">留空表示不限制</span></label>
+    <div class="row">
+      <div><input type="date" id="start"></div>
+      <div><input type="date" id="end"></div>
+    </div>
+
+    <div class="actions">
+      <button id="run">开始导出</button>
+      <button id="csv" class="ghost" disabled>下载 CSV</button>
+      <button id="xlsx" class="ghost" disabled>下载 Excel</button>
+      <span id="count" class="tag"></span>
+    </div>
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <div id="status" class="card status">
+    <div class="phase" id="phase">准备中…</div>
+    <div class="bars">
+      <div class="metric"><b id="pages">0</b><span>列表页</span></div>
+      <div class="metric"><b id="found">0</b><span>命中文章</span></div>
+      <div class="metric"><b id="done">0</b><span>已取指标</span></div>
+      <div class="metric"><b id="errs">0</b><span>失败</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tblwrap">
+      <table>
+        <thead>
+          <tr><th style="width:46%">公众号标题</th><th style="width:22%">发布链接</th><th>发布时间</th><th style="width:62px">点赞</th><th style="width:62px">收藏</th><th style="width:62px">转发</th><th style="width:62px">评论</th></tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7" class="empty">还没有数据</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <details id="errdetail" style="display:none">
+      <summary>失败明细</summary>
+      <div class="inner" id="errlist"></div>
+    </details>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let job = null;
+let timer = null;
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function fmt(n) { return (n === null || n === undefined) ? "—" : n; }
+
+function render(rows) {
+  const tb = $("#tbody");
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="empty">还没有数据</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.map((r) => `
+    <tr>
+      <td>${esc(r.title)}</td>
+      <td><a href="${esc(r.url)}" target="_blank" rel="noreferrer">${esc(r.url.slice(0, 80))}${r.url.length > 80 ? "…" : ""}</a></td>
+      <td>${esc(r.time)}</td>
+      <td class="num">${fmt(r.like)}</td>
+      <td class="num">${fmt(r.collect)}</td>
+      <td class="num">${fmt(r.share)}</td>
+      <td class="num">${fmt(r.comment)}</td>
+    </tr>`).join("");
+}
+
+async function poll() {
+  if (!job) return;
+  const res = await fetch("/api/status?job=" + job);
+  const s = await res.json();
+  $("#status").classList.add("on");
+  $("#phase").textContent = s.state === "running" ? s.phase + "…" : (s.state === "done" ? "完成" : "出错");
+  $("#pages").textContent = s.pages;
+  $("#found").textContent = s.found;
+  $("#done").textContent = s.metrics_done + (s.metrics_total ? " / " + s.metrics_total : "");
+  $("#errs").textContent = s.error_count;
+
+  render(s.rows);
+  $("#count").textContent = s.rows.length ? `共 ${s.rows.length} 行` : "";
+
+  const msg = $("#msg");
+  msg.className = "msg" + (s.state === "error" ? " err" : s.message ? " warn" : "");
+  msg.textContent = s.message || "";
+
+  if (s.errors && s.errors.length) {
+    $("#errdetail").style.display = "";
+    $("#errlist").innerHTML = s.errors.map((e) => "<div>" + esc(e) + "</div>").join("");
+  }
+
+  const finished = s.state !== "running";
+  $("#run").disabled = !finished;
+  $("#xlsx").disabled = !finished || !s.rows.length;
+  $("#csv").disabled = !finished || !s.rows.length;
+
+  if (finished) { clearInterval(timer); timer = null; }
+}
+
+$("#run").addEventListener("click", async () => {
+  const payload = {
+    credential: $("#credential").value.trim(),
+    account: $("#account").value.trim(),
+    start: $("#start").value,
+    end: $("#end").value,
+  };
+  if (!payload.credential) { alert("请先粘贴凭据"); return; }
+
+  $("#run").disabled = true;
+  $("#xlsx").disabled = true;
+  $("#csv").disabled = true;
+  $("#msg").className = "msg";
+  $("#msg").textContent = "";
+
+  const res = await fetch("/api/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    $("#run").disabled = false;
+    $("#msg").className = "msg err";
+    $("#msg").textContent = data.error || "启动失败";
+    return;
+  }
+  job = data.job;
+  $("#status").classList.add("on");
+  poll();
+  timer = setInterval(poll, 900);
+});
+
+function dl(ext) {
+  if (!job) return;
+  window.location.href = `/api/export.${ext}?job=${job}`;
+}
+$("#xlsx").addEventListener("click", () => dl("xlsx"));
+$("#csv").addEventListener("click", () => dl("csv"));
+
+$("#grab").addEventListener("click", async () => {
+  const tip = $("#grabtip");
+  tip.textContent = "读取中…";
+  let r, d;
+  try {
+    r = await fetch("/api/capture");
+  } catch (e) {
+    tip.textContent = "连不上本地服务：请确认「启动.bat」的黑窗口还开着（关掉就没了）";
+    return;
+  }
+  d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (d.error === "not found") tip.textContent = "网页后端是旧版本：关掉黑窗口，重新双击「启动.bat」";
+    else tip.textContent = d.error || ("读取失败（HTTP " + r.status + "）");
+    return;
+  }
+  $("#credential").value = d.credential;
+  tip.textContent = "已填入（抓取于 " + d.mtime + "，几小时后过期需重抓）";
+});
+</script>
+</body>
+</html>
