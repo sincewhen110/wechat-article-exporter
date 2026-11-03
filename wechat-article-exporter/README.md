@@ -4,12 +4,93 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+**[English summary](#english-summary)** · **[中文说明](#中文说明)**
+
+---
+
+## English summary
+
+A small, **fully local** tool that exports the article history of any WeChat Official Account (公众号) to an Excel spreadsheet within a date range — title, link, publish time, likes, favorites, shares and comments in one sheet.
+
+No dependencies: standard-library Python only. Nothing is uploaded anywhere; your session credential lives in memory and in a local `credential.txt` that is git-ignored.
+
+### Features
+
+- **Date-range export** — pick a start and end date; pagination stops as soon as it walks past the start date, so you don't have to crawl to the bottom of a large account.
+- **Seven columns, one sheet** — title, link, publish time, likes, favorites, shares, comments.
+- **Excel or CSV** — xlsx is written by a tiny built-in writer (zip + XML), so `openpyxl`/`pandas` are not needed.
+- **Browser UI on localhost** — the panel binds to `127.0.0.1:8765` only; it is never reachable from the network.
+- **Credential helper included** — a bundled local proxy intercepts `mp.weixin.qq.com` only, extracts the `action=getmsg` URL, and restores your system proxy afterwards.
+- **Polite by default** — 1.2 s between list pages, 3 workers with a 0.5 s pause per article.
+
+### Quick start
+
+Requires [Python 3.8+](https://www.python.org/downloads/) (tick *Add python.exe to PATH* on Windows).
+
+```bash
+git clone https://github.com/<your-username>/wechat-article-exporter.git
+cd wechat-article-exporter
+
+python app.py          # Windows: you can also just double-click 启动.bat
+```
+
+Your browser opens <http://127.0.0.1:8765> automatically. If that port is taken it walks forward; you can also pass one explicitly: `python app.py 9000`.
+
+### Usage
+
+1. **Get a session credential** (valid for a few hours). Double-click `抓取凭据.bat` on Windows: it installs a local root CA (one-time prompt), points the system proxy at `127.0.0.1:8898` while decrypting only `mp.weixin.qq.com`, and waits for you to fully restart WeChat and open any article of the target account. The captured URL is written to `credential.txt` and the proxy is restored. Then click *读取本机抓取结果* in the panel.
+2. **Export.** Paste an `action=getmsg` URL (or a whole cookie string), paste any article link of the target account (the `__biz` is extracted automatically), choose the date range, hit start, then download the xlsx or CSV.
+
+> No Windows? Capture the `action=getmsg` request yourself with mitmproxy / Charles / Proxyman and paste the full URL — the exporter part is cross-platform (`python3 app.py`).
+
+### Output columns
+
+| Column | Source |
+| --- | --- |
+| 公众号标题 / title | `title` from the article list |
+| 发布链接 / link | `link`, normalised to `https://` and unescaped |
+| 发布时间 / published at | article page `ct` (Unix seconds) → local `YYYY-MM-DD HH:MM:SS` |
+| 点赞 / likes | `like_count` |
+| 收藏 / favorites | `collect_count` |
+| 转发 / shares | `share_count` |
+| 评论 / comments | `comment_count` |
+
+The four metric columns are only returned when the article request carries a valid WeChat session (`key` + cookie). With an expired credential they will be empty.
+
+### How it works
+
+```
+WeChat client ──system proxy──> 127.0.0.1:8898 (capture_proxy.py)
+                                    │  MITM mp.weixin.qq.com only
+                                    └─> action=getmsg URL ──> credential.txt
+                                                                     │
+browser panel (127.0.0.1:8765) <── app.py <──────────────────────────┘
+        │                          │ paginate the list (1.2 s / page)
+        └── xlsx / csv <───────────┴ fetch metrics concurrently (3 workers, 0.5 s / article)
+```
+
+- `app.py` — `ThreadingHTTPServer` from the standard library, plus a hand-rolled xlsx writer.
+- `capture/capture_proxy.py` — SNI-based routing with `ssl`; anything that is not `mp.weixin.qq.com` is tunnelled through untouched.
+- `capture/gencert.cs` — generates the local CA and the `mp.weixin.qq.com` leaf certificate with .NET. A prebuilt `gencert.exe` is included; build it yourself with `csc /target:exe /out:gencert.exe gencert.cs` if you prefer.
+
+### Notes
+
+- Binds to loopback only; nothing listens on your LAN.
+- Best-effort scraping of a private API: WeChat can change parameters or rate-limit you at any time. There is a hard cap of 300 pages (≈ 3000 articles) per run.
+- Use it only for content you are allowed to access, and respect the WeChat Terms of Service and copyright law. The authors take no responsibility for how it is used.
+- Windows is the only platform with the credential-capture helper; the exporter itself is cross-platform.
+
+### License
+
+[MIT](LICENSE) © 2026 wechat-article-exporter contributors
+
+---
+
+## 中文说明
+
 一个**完全在本机运行**的小工具：把任意微信公众号的历史文章，按时间段导出成 Excel（xlsx / csv），一次拿到标题、链接、发布时间、点赞、收藏、转发、评论。
 
 只用 Python 标准库，不联网上传任何数据，凭据只存在内存里。
-
-
----
 
 ## 功能
 
