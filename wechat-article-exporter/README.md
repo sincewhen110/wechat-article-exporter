@@ -28,7 +28,7 @@ No dependencies: standard-library Python only. Nothing is uploaded anywhere; you
 Requires [Python 3.8+](https://www.python.org/downloads/) (tick *Add python.exe to PATH* on Windows).
 
 ```bash
-git clone https://github.com/<your-username>/wechat-article-exporter.git
+git clone https://github.com/sincewhen110/wechat-article-exporter.git
 cd wechat-article-exporter
 
 python app.py          # Windows: you can also just double-click 启动.bat
@@ -114,7 +114,7 @@ browser panel (127.0.0.1:8765) <── app.py <───────────
 需要 [Python 3.8+](https://www.python.org/downloads/)（安装时勾选 *Add python.exe to PATH*）。
 
 ```bash
-git clone https://github.com/<你的用户名>/wechat-article-exporter.git
+git clone https://github.com/sincewhen110/wechat-article-exporter.git
 cd wechat-article-exporter
 
 python app.py            # Windows 上也可以直接双击 启动.bat
